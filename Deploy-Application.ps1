@@ -62,8 +62,8 @@ Try {
 	[string]$appArch = 'x64'
 	[string]$appLang = 'EN'
 	[string]$appRevision = '01'
-	[string]$appScriptVersion = '1.1.0'
-	[string]$appScriptDate = '10/26/2017'
+	[string]$appScriptVersion = '1.1.1'
+	[string]$appScriptDate = '10/31/2017'
 	[string]$appScriptAuthor = 'Jordan Hamilton'
 	##*===============================================
 	## Variables: Install Titles (Only set here to override defaults set by the toolkit)
@@ -118,8 +118,15 @@ Try {
 		Show-InstallationProgress
 
 		## <Perform Pre-Installation tasks here>
-		Remove-MSIApplications -Name "PuTTY"
+		If (Test-Path -LiteralPath (Join-Path -Path $envProgramFilesX86 -ChildPath "PuTTY\unins000.exe") -PathType 'Leaf') {
+			Write-Log -Message 'PuTTY was previously installed with an executable. Will be uninstalled.' -Source $deployAppScriptFriendlyName
+			Remove-RegistryKey -Key "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\PuTTY_is1"
+			Remove-File -Path "$envProgramFilesX86\PuTTY" -Recurse -ContinueOnError $true
+			Remove-Folder -Path "$envProgramFilesX86\PuTTY" -ContinueOnError $true
+		}
 
+		$exitCode = Remove-MSIApplications -Name "PuTTY" -PassThru
+		If (($exitCode.ExitCode -ne "0") -and ($mainExitCode -ne "3010")) { $mainExitCode = $exitCode.ExitCode }
 		##*===============================================
 		##* INSTALLATION
 		##*===============================================
@@ -205,8 +212,8 @@ Catch {
 # SIG # Begin signature block
 # MIIU4wYJKoZIhvcNAQcCoIIU1DCCFNACAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDUu2S3r5PaHh9p
-# RzJPLNbcdQOxsVx1AFfQQyDTtjsRmKCCD4cwggQUMIIC/KADAgECAgsEAAAAAAEv
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDdXV2cCJec+jM7
+# PdJ7i8dbcFnTprUiqekBPPkTh1jpvKCCD4cwggQUMIIC/KADAgECAgsEAAAAAAEv
 # TuFS1zANBgkqhkiG9w0BAQUFADBXMQswCQYDVQQGEwJCRTEZMBcGA1UEChMQR2xv
 # YmFsU2lnbiBudi1zYTEQMA4GA1UECxMHUm9vdCBDQTEbMBkGA1UEAxMSR2xvYmFs
 # U2lnbiBSb290IENBMB4XDTExMDQxMzEwMDAwMFoXDTI4MDEyODEyMDAwMFowUjEL
@@ -293,26 +300,26 @@ Catch {
 # FgNlZHUxGTAXBgoJkiaJk/IsZAEZFgltc3VkZW52ZXIxFTATBgoJkiaJk/IsZAEZ
 # FgV3aW5hZDEZMBcGA1UEAxMQd2luYWQtVk1XQ0EwMS1DQQITfwAAACITuo77mvOv
 # 9AABAAAAIjANBglghkgBZQMEAgEFAKBmMBgGCisGAQQBgjcCAQwxCjAIoAKAAKEC
-# gAAwGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcCAQQwLwYJKoZIhvcNAQkEMSIEILC9
-# kV1Vdjf03YuToTqI8MWsgW24lIFgQqAeFe9DhlHkMA0GCSqGSIb3DQEBAQUABIIB
-# AETUagC9gre46s4f2hqliFAQArly7FNljVdoWk7xW/vFf2aBfOGLoIjkO2f1ug6b
-# jickLQxPIJGUdP2oFsAnVIBBxRV8ZtcEUJxMkUA5keOZRY+Q1b7LQcGemOmeaTKF
-# xXl2U+ObpUmaSPeZDj+RGsk3ftfmW5N9Nh9+qgo2OSiFXQF/D4fAfZwsWPJuSitE
-# SJD8mVqNCsyDtK5vEEhZkySykBBgLxWW4JnZE8oYuv1G9YhDl4uUd7rjxV5Jh1SE
-# nYYYu2Gpy8KwVmsEQNPAxgdYKnnsszGqnGSGwLpvQofGupen7s51MaZj9RXZyi0+
-# x5s1tzylgPbFsoDGykpBBaahggKiMIICngYJKoZIhvcNAQkGMYICjzCCAosCAQEw
+# gAAwGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcCAQQwLwYJKoZIhvcNAQkEMSIEIPap
+# 4E7wX5pkN14PVKeGW/QE9Kygov71TiO+To9cHnU3MA0GCSqGSIb3DQEBAQUABIIB
+# AE0l39w1N1wdsDtjhpfCdlaD5BqT+MlnnC2UPf5y+G3hTPjdMXah+u1K3oUQkd7j
+# SzeB8mIAJBok8wET3KQ4mtuBkSMOBxeQM/7lOmQ4R12g5VSI3PV/f3nb3u9Zg5Z7
+# L9tjK1fKyN5UMCp9hb4JkdVWke8Rb6FXQujOdZpW5/bAFrOIx5eyCO/nGCFBjG0p
+# zrQ/wcXqkeUVb8WmHlK4gz2S6kjjGsvfZHwxlC0kPmRJidPsNdc5ZZP1wWrNiXku
+# r0HhlDMlboTn+DZMDQFdYeINW8dlC6QxacltD5EnUEVTYt7yxp5wTNodCi3QPXDj
+# VhpuK6HRxRNJyJ9ylM9N216hggKiMIICngYJKoZIhvcNAQkGMYICjzCCAosCAQEw
 # aDBSMQswCQYDVQQGEwJCRTEZMBcGA1UEChMQR2xvYmFsU2lnbiBudi1zYTEoMCYG
 # A1UEAxMfR2xvYmFsU2lnbiBUaW1lc3RhbXBpbmcgQ0EgLSBHMgISESHWmadklz7x
 # +EJ+6RnMU0EUMAkGBSsOAwIaBQCggf0wGAYJKoZIhvcNAQkDMQsGCSqGSIb3DQEH
-# ATAcBgkqhkiG9w0BCQUxDxcNMTcxMDI2MTkwNzUxWjAjBgkqhkiG9w0BCQQxFgQU
-# 4uWDml39sijPnc/n3iIpwrADDvAwgZ0GCyqGSIb3DQEJEAIMMYGNMIGKMIGHMIGE
+# ATAcBgkqhkiG9w0BCQUxDxcNMTcxMDMxMjE1MzAyWjAjBgkqhkiG9w0BCQQxFgQU
+# csYhOGp2HUuaEZcpuqT7uA0BA4MwgZ0GCyqGSIb3DQEJEAIMMYGNMIGKMIGHMIGE
 # BBRjuC+rYfWDkJaVBQsAJJxQKTPseTBsMFakVDBSMQswCQYDVQQGEwJCRTEZMBcG
 # A1UEChMQR2xvYmFsU2lnbiBudi1zYTEoMCYGA1UEAxMfR2xvYmFsU2lnbiBUaW1l
 # c3RhbXBpbmcgQ0EgLSBHMgISESHWmadklz7x+EJ+6RnMU0EUMA0GCSqGSIb3DQEB
-# AQUABIIBACRGmMxegcfkpg/PZ4ZjvA6j64uPiOpexxfm9DNrty4XSSDfRU6unUk1
-# 1dFR0Q4QUlOlzmrzOZETUKxrVA4lk+uE2r1jFPcJS5KO8SXjUNvPKnwMI1rpzHmD
-# OXdp72V+B05dbI9nQJ5GOo4mTQzekyX4IcUFRaIoH8t3BzjZ/qRYv8DnWHlIhhn7
-# 1/B7Ga8zeRzCQjI6HLVZGF486DXTk7Z4nf8SOPBAuOMRCSjmwaGq0/yuFyIoPigV
-# czLWwppvWVMSQKIQz3qbhyHJ96FZfTbIOHdFdjbiicKa97Zamo/m5q5Y+c9x+X+t
-# INQ5zTwIgw9qKJJKCqhEGAuMdIkI8Ec=
+# AQUABIIBAEUZTvBweVoGGjxIpvW4Cp2B2b9t+balj1q/mO8G2JMnTq8mrsTn0P93
+# XJGmnhSiZ6TW/e5zF7uP1db9V89wdf++e2U5CRq+yfmVsEmoVmLPvdU369/h+yLP
+# zL4AKs/IA2GFPRt8UEwMHtZXpddzLtmtXfzC1NXkH/iqt2zYMLO4AmrcYWFkbfeg
+# m7DFGAFe3UMMzsVw/rOv2nZbn5TEPbFLT7XPdBidfmxDze3mNLFApfTAGP30XpcG
+# gIggJ6TbB6ulR+DVUlozdOuIV8iTM8uZV/85Zpx9qZeqgp7zaPAHaGhoJzP2JFvA
+# pFRE33HCDPgiyiE+XvFdCuQjwGZve2A=
 # SIG # End signature block
