@@ -1,23 +1,138 @@
-Describe 'Testing against PSScriptAnalyzer rules' {
-	Context 'PSScriptAnalyzer Standard Rules' {
-		$analysis = Invoke-ScriptAnalyzer -Path 'Deploy-Application.ps1'
-		$scriptAnalyzerRules = Get-ScriptAnalyzerRule
-		forEach ($rule in $scriptAnalyzerRules) {
-			It "Should pass $rule" {
-				If ($analysis.RuleName -contains $rule) {
-					$analysis | Where-Object RuleName -EQ $rule -OutVariable failures | Out-Default
-					$failures.Count | Should Be 0
-				}
-			}
-		}
-	}
+## Define variables
+$fileShare = New-PSSession -ComputerName $Env:serverName
+
+$stagingDir = $Env:stagingDirectory
+$cert = (Get-ChildItem Cert:\LocalMachine\My -CodeSigningCert)
+$timestampServer =  "http://timestamp.comodoca.com"
+
+$initParams = @{}
+## Uncomment the next line for debugging
+## $initParams.Add("Verbose", $true)
+
+## Set application properties
+$appName = $Env:APPVEYOR_PROJECT_NAME
+$appName = $appName -replace "_+"," " -replace "\-{2,}"," - " -replace "\b-+\b"," "
+$install = "Deploy-Application.exe -DeploymentType `"Install`" -AllowRebootPassThru"
+$uninstall = "Deploy-Application.exe -DeploymentType `"Uninstall`" -AllowRebootPassThru"
+
+## Determine the app's author
+switch ($Env:APPVEYOR_REPO_COMMIT_AUTHOR) {
+  $Env:jordanGitHub { $author = $Env:jordan }
+  $Env:quanGitHub { $author = $Env:quan }
+  $Env:steveGitHub { $author = $Env:steve }
+  $Env:truongGitHub { $author = $Env:truong }
+  $Env:jamesGitHub { $author = $Env:james }
 }
+
+## Remove unneeded files from the repository before uploading to the file share
+Write-Output "Cleaning up Git and CI files..."
+Remove-Item -Path "$Env:APPLICATION_PATH\appveyor.yml"
+Remove-Item -Path "$Env:APPLICATION_PATH\deploy.ps1"
+Remove-Item -Path "$Env:APPLICATION_PATH\TestsResults.xml"
+Remove-Item -Path "$Env:APPLICATION_PATH\.DS_Store" -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "$Env:APPLICATION_PATH\.gitignore" -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "$Env:APPLICATION_PATH\.gitattributes" -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "$Env:APPLICATION_PATH\Tests" -Recurse
+Remove-Item -Path "$Env:APPLICATION_PATH\.git" -Recurse -Force
+
+## Sign PowerShell files to allow running the script directly with a RemoteSigned execution policy
+Get-ChildItem  "$Env:APPLICATION_PATH\AppDeployToolkit" `
+  | Where-Object { $_.Name -like "*.ps1" } `
+    | ForEach-Object `
+      { Set-AuthenticodeSignature $_.FullName $cert `
+        -HashAlgorithm SHA256 `
+        -TimestampServer "$timestampServer" `
+      }
+
+Get-ChildItem  "$Env:APPLICATION_PATH" `
+  | Where-Object { $_.Name -like "Deploy-Application.ps1" } `
+    | ForEach-Object `
+      { Set-AuthenticodeSignature $_.FullName $cert `
+        -HashAlgorithm SHA256 `
+        -TimestampServer "$timestampServer" `
+      }
+
+$contentLocation = "$Env:stagingContentLocation\$appName"
+
+## Remove previous staging toolkit files if detected, except for Files and SupportFiles
+Invoke-Command -Session $fileShare -ScriptBlock {
+  If (Test-Path -Path "$Using:stagingDir\$Using:appName" -PathType Container) {
+    Write-Output "Removing staging PowerShell App Deployment Toolkit..."
+    Remove-Item -Path "$Using:stagingDir\$Using:appName\*.*" -Force | Where-Object { ! $_.PSIsContainer }
+    Remove-Item -Path "$Using:stagingDir\$Using:appName\AppDeployToolkit" -Force -Recurse | `
+      Where-Object { $_.PSIsContainer }
+  } Else {
+    New-Item -Path $Using:stagingDir -Name $Using:appName -ItemType "directory"
+  }
+}
+
+## Upload the repository to the staging directory, overwriting any remaining files or support files
+Copy-Item -Path "$Env:APPLICATION_PATH\*" -Destination "$stagingDir\$appName\" -ToSession $fileShare -Force -Recurse
+
+## Set the application name as we want it to appear in Configuration Manager
+$appName = "Staging - $appName"
+
+## Import the ConfigurationManager.psd1 module
+If ($null -eq (Get-Module ConfigurationManager)) {
+  Import-Module "$($Env:SMS_ADMIN_UI_PATH)\..\ConfigurationManager.psd1" @initParams
+}
+
+## Connect to the site's drive if it is not already present
+If ($null -eq (Get-PSDrive -Name $Env:siteCode -PSProvider CMSite -ErrorAction SilentlyContinue)) {
+  New-PSDrive -Name $Env:siteCode -PSProvider CMSite -Root $Env:siteServer @initParams
+}
+
+## Set the active PSDrive to the ConfigMgr site code
+Set-Location "$($Env:siteCode):\" @initParams
+
+## Create the ConfigMgr application (if it doesn't exist) in the format "Staging - GitHub project name"
+## This also adds a link to the GitHub repository in the Administrator Comments field for reference and checks the box next to "Allow this application to be installed from the Install Application task sequence action without being deployed"
+## Reference: https://docs.microsoft.com/en-us/powershell/module/configurationmanager/new-cmapplication
+If ((Get-CMApplication -Name $appName -ErrorAction SilentlyContinue) `
+  -or (Get-CMApplication -Name "Staging - $Env:APPVEYOR_PROJECT_NAME" -ErrorAction SilentlyContinue)) {
+  
+    ## Rename an existing Staging application if detected
+  If (Get-CMApplication -Name "Staging - $Env:APPVEYOR_PROJECT_NAME" -ErrorAction SilentlyContinue) {
+    Get-CMApplication -Name "Staging - $Env:APPVEYOR_PROJECT_NAME" | Set-CMApplication -NewName $appName
+  }
+  ## Clear any existing owners and support contacts
+  Get-CMApplication -Name $appName | Set-CMApplication -ClearOwner -ClearSupportContact
+} Else {
+  New-CMApplication -Name $appName
+}
+
+Get-CMApplication -Name $appName | `
+  Set-CMApplication -Description "Repository: https://github.com/$Env:APPVEYOR_REPO_NAME" `
+    -ReleaseDate $(Get-Date -Format d) `
+    -Owner $author `
+    -SupportContact 'System Engineers' `
+    -AutoInstall $True
+
+## Create a new script deployment type with standard settings for PowerShell App Deployment Toolkit
+## You'll need to manually update the deployment type's detection method to find the software, make any other needed customizations to the application and deployment type, then distribute your content when ready.
+## Reference: https://docs.microsoft.com/en-us/powershell/module/configurationmanager/add-cmscriptdeploymenttype
+Get-CMApplication -Name $appName | `
+  Add-CMScriptDeploymentType -DeploymentTypeName `
+    "$appName $Env:APPVEYOR_BUILD_VERSION" `
+    -InstallCommand $install `
+    -ScriptLanguage "PowerShell" `
+    -ScriptText "Update this application's detection method to accurately locate the application." `
+    -ContentLocation $contentLocation `
+    -InstallationBehaviorType "InstallForSystem" `
+    -LogonRequirementType "WhetherOrNotUserLoggedOn" `
+    -MaximumRuntimeMins 120 `
+    -UserInteractionMode "Normal" `
+    -UninstallCommand $uninstall `
+    -ContentFallback `
+    -Comment "Commit: https://github.com/$Env:APPVEYOR_REPO_NAME/commit/$Env:APPVEYOR_REPO_COMMIT" `
+    -SlowNetworkDeploymentMode 'Download' `
+    -EnableBranchCache
 
 # SIG # Begin signature block
 # MIIfLgYJKoZIhvcNAQcCoIIfHzCCHxsCAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBJol4ZvWBI8j54
-# V2+M9wfWxeV72/5t+cdR21/hhnrh1KCCGhUwggSEMIIDbKADAgECAhBCGvKUCYQZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCAtDoe0ebtDJthM
+# KNHCzpVbaRvtg2gcjjkWxg/UrlfuWaCCGhUwggSEMIIDbKADAgECAhBCGvKUCYQZ
 # H1IKS8YkJqdLMA0GCSqGSIb3DQEBBQUAMG8xCzAJBgNVBAYTAlNFMRQwEgYDVQQK
 # EwtBZGRUcnVzdCBBQjEmMCQGA1UECxMdQWRkVHJ1c3QgRXh0ZXJuYWwgVFRQIE5l
 # dHdvcmsxIjAgBgNVBAMTGUFkZFRydXN0IEV4dGVybmFsIENBIFJvb3QwHhcNMDUw
@@ -162,23 +277,23 @@ Describe 'Testing against PSScriptAnalyzer rules' {
 # bkNvbW1vbiBSU0EgQ29kZSBTaWduaW5nIENBAhAHA3HRD3laQHGZK5QHYpviMA0G
 # CWCGSAFlAwQCAQUAoIGEMBgGCisGAQQBgjcCAQwxCjAIoAKAAKECgAAwGQYJKoZI
 # hvcNAQkDMQwGCisGAQQBgjcCAQQwHAYKKwYBBAGCNwIBCzEOMAwGCisGAQQBgjcC
-# ARUwLwYJKoZIhvcNAQkEMSIEIAtHAfiqdxbZ50d5H1wHikHV3Gl7qIgiiZEQJ+mC
-# 5k9hMA0GCSqGSIb3DQEBAQUABIIBAG9TFA1bRPfhGsPLVJh25+zM+iADYQPeag4q
-# i0yuQKAb4+Zxo1ISYMPmPRDkNsPSzsgvmYtiJQeCo9KfYTuqmv5lI6GyWB8mT6fK
-# UMZ6g495GVxot1XnSMEHF0qgaraVQuQEwF+FKwrlOe2kNaOWkKLT6GdUoA5cDFcm
-# wdWVucUINJk81OCWIsrd3Iw0f9Wy2AYwh+VPK1VTA7DgALsNOCD5NhA1ZqcVKr63
-# 9IzyUXm+LAFopd+rjg9SqRaRDutjhYN4tbD+JD3RE9ByJhU+Qn7efq0VckY+6udW
-# 3H4sFmYKx0qH9HbtupfHbydhwjh5MrgmCZ+0VtoCcDwsIThfd/yhggIoMIICJAYJ
+# ARUwLwYJKoZIhvcNAQkEMSIEIPBYtymgEC+Bkw5FxpgyWW8/k3mWpFT26IaVX7AA
+# HOtmMA0GCSqGSIb3DQEBAQUABIIBABuhJVME1C7tmmzj/eb+jFTPXsLKvJkvM6al
+# W72rH+DncobgexshV+Ni2AE8sELw0IWSa3c8eQ7dIc9Kmlx+XQmd9cA8zVRgmTDX
+# dwHhbZ7FaeV2FDSH3cvWojkYAenapWIUWFEMe9beeDqgxv4rjXVJylaO8QiU10Dy
+# sQoxoyWD8zRUVBQucUg+31ho3QN6LwEPP8niT+A17ZzzR9iFkrQXwOT88s1iUMsR
+# 9Kg93KqRNJn3p2bfBQrVJ9zExBclNY3fmRnlVc3VhzmfJEg2DyhLNZqbK3lQ2DKe
+# FA6nndWrFPEXBoU6zEJqDwUY4SZyGD9MkL28SKZVP21CHm4K+COhggIoMIICJAYJ
 # KoZIhvcNAQkGMYICFTCCAhECAQEwgY4wejELMAkGA1UEBhMCR0IxGzAZBgNVBAgT
 # EkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4GA1UEBxMHU2FsZm9yZDEaMBgGA1UEChMR
 # Q09NT0RPIENBIExpbWl0ZWQxIDAeBgNVBAMTF0NPTU9ETyBUaW1lIFN0YW1waW5n
 # IENBAhArc9t0YxFMWlsySvIwV3JJMAkGBSsOAwIaBQCgXTAYBgkqhkiG9w0BCQMx
-# CwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0yMDA0MjIxNTI1MTFaMCMGCSqG
-# SIb3DQEJBDEWBBSbRgoNJDEt3du/ElFjVG8QH3MFjTANBgkqhkiG9w0BAQEFAASC
-# AQABT5murjpdPV+55Blei0kpfIhE74aYMUZQb0/PnfpjlWMgDwfXhSCrDX3OSA/E
-# Kf9r9/fEDbeAbEqYIwsAzx7EvDNTZWsbffUXLPWvCIp00dHh902LjLzp50cZBPyV
-# BGRQCRzzoq4Kc/cTmx7WpQjLVJhs5aOGM2rr9qWpTGxRrAVp2S0Enai1NfyeP/Ol
-# iYnYFSvn2VYFNWuNg/jItSu6KgQg/raUB2XJmzWisdbv0TddfKUaaiRC4DHKQLn1
-# nk4Y675Or8bo1eIcfFmk8qWPbv0ZAuImBe2wOUBYuxkmw2YcCnqS5yy3yfY8JB4L
-# E1E7rnnW9EnktoBEaFdiodPy
+# CwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0yMDA0MjIxNTI1MDhaMCMGCSqG
+# SIb3DQEJBDEWBBRqGsXK7q29NmD+1og3tBQTDJrhXjANBgkqhkiG9w0BAQEFAASC
+# AQCZAphPLR3oMl/qAgXOS+bYQANDFyfugDNsnNP6rrKvOptv1frdsA53nnd3r281
+# BQrA1j73JOjGML05TzgB2KpYliNUDWAhUBpVG34gwSTnxu8rT+E9saY778IXADa0
+# bo/snmdgcC1HP7J1Jm4zszirDvjYAa8vg4MZpJSNMjiAq3u+3R8KRjtnhkkFIaZn
+# Rkuz5i7kjfSDj7tplmTy3A0wGXryaKd4m4psZV53f3RRbc+smjGeij4y4tIirN2g
+# PcYJe0M7Yco62oG072VJHRM+91FFUCgw6ActJnXubEqWyyq/T0Xr6kLi0xO9nKDZ
+# wU1hYqrNxPGMwf3aTi4twYAv
 # SIG # End signature block
