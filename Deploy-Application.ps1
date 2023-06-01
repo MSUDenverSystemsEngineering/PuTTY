@@ -64,12 +64,12 @@ Try {
 	## Variables: Application
 	[string]$appVendor = ''
 	[string]$appName = 'PuTTY'
-	[string]$appVersion = '0.78'
+	[string]$appVersion = '0.79'
 	[string]$appArch = 'x64'
 	[string]$appLang = 'EN'
 	[string]$appRevision = '01'
 	[string]$appScriptVersion = '1.0.0'
-	[string]$appScriptDate = '03/23/2023'
+	[string]$appScriptDate = '06/01/2023'
 	[string]$appScriptAuthor = 'Will Jarvill'
 	##*===============================================
 	## Variables: Install Titles (Only set here to override defaults set by the toolkit)
@@ -143,16 +143,14 @@ Try {
 		}
 
 		## <Perform Installation tasks here>
-		$exitCode = Execute-MSI -Action 'Install' -Path "putty-64bit-$appVersion-installer.msi" -Parameters "REBOOT=ReallySuppress /QN" -PassThru
+		$exitCode = Execute-MSI -Action 'Install' -Path "putty-64bit-0.79-pre20230601-installer.msi" -Parameters "REBOOT=ReallySuppress /QN" -PassThru
 		If (($exitCode.ExitCode -ne "0") -and ($mainExitCode -ne "3010")) { $mainExitCode = $exitCode.ExitCode }
 
 		##*===============================================
 		##* POST-INSTALLATION
 		##*===============================================
 		[string]$installPhase = 'Post-Installation'
-		Copy-File -Path "$dirSupportFiles\PuTTY" -Destination "C:\ProgramData\Microsoft\Windows\Start Menu\Programs" -Recurse
-		## <Perform Post-Installation tasks here>
-		Remove-File -Path "$envCommonDesktop\PuTTY.lnk" -ContinueOnError $true
+
 		## Display a message at the end of the install
 		If (-not $useDefaultMsi) {
 
@@ -253,8 +251,8 @@ Catch {
 # SIG # Begin signature block
 # MIImVAYJKoZIhvcNAQcCoIImRTCCJkECAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCB7Caew7en1ne8m
-# UtXBd5p/XnCBBNKHaT37eTAm4oz526CCH8AwggVvMIIEV6ADAgECAhBI/JO0YFWU
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDJItbXcW/ao1/x
+# Y/wRksnyLnkavsV/zEdnt1svX0kcPaCCH8AwggVvMIIEV6ADAgECAhBI/JO0YFWU
 # jTanyYqJ1pQWMA0GCSqGSIb3DQEBDAUAMHsxCzAJBgNVBAYTAkdCMRswGQYDVQQI
 # DBJHcmVhdGVyIE1hbmNoZXN0ZXIxEDAOBgNVBAcMB1NhbGZvcmQxGjAYBgNVBAoM
 # EUNvbW9kbyBDQSBMaW1pdGVkMSEwHwYDVQQDDBhBQUEgQ2VydGlmaWNhdGUgU2Vy
@@ -428,32 +426,32 @@ Catch {
 # MSswKQYDVQQDEyJTZWN0aWdvIFB1YmxpYyBDb2RlIFNpZ25pbmcgQ0EgUjM2AhEA
 # pU3fcPvc8UxUgrjysXLKMTANBglghkgBZQMEAgEFAKCBhDAYBgorBgEEAYI3AgEM
 # MQowCKACgAChAoAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQB
-# gjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCBAljez/YbkYtgG
-# LD4cxSW9ovdVhBLoN+/jhwyChSs7hTANBgkqhkiG9w0BAQEFAASCAYAjyQXkkze5
-# Ezchi7Uvi/wiJX7vyzydfsV7/RW9TjxLyRzP4+lTMhl2HqxnPigXe0PHasawlQWI
-# Dp4UNeWkjWsxkzhk4wFAbhF6ekqZPgYwk5sYHkGBj9Fn66ytrLjuAL9X6RuQX2GB
-# zR2oGQRVZIslK7EqSgAyuYCrjvR1XS9voDGEpz43sLaU1/JT9paJhzUp+ynwSvh4
-# mZq8QPWb+4Rfp/lLzIX3ffGFKNj0oJIKM1EzAZJhF1aZFn9ochRZnniE1gR8hg09
-# 9gK0lhzj9cGmDr/FiCHHO435jdGGVsEeWO/J1660gh/yRpAtGwOHKhTiI3v6oi2L
-# +jq/qFczbBj4qtXtSM5mvHU56X9WiJSQfe9Bh/fz3P+frooKjXpUBPiOxiwaSugH
-# kALIZX7LB84voOaiHGUjWhZZnQy0mJHCyJMynv3ozwDVuTd30bq8XuP5YW7nSMpb
-# RsbgY4KIrjdTSZNXVcffUsXfWdU9ymtVYfDTiMJQ64GHycjJBLT6LamhggNLMIID
+# gjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCA2PCDm/BB67k0w
+# pxafYk8acAxnXn7Y58fZEFJccWvpCjANBgkqhkiG9w0BAQEFAASCAYBTZ0Gifhug
+# bJEywXMHeozWgS8dxTCmU1RnLrSi9XvFOeLK28/e22MDYK7m45CcBSq3KUqyrwU9
+# utILMeoKs5Gr9K71AZAVJntKhYs9hHW4DzHu9iEZFUrqxwEr8IgudIuzo/TXQGJn
+# 52dGlaP2uRy7D2voMHTZEms1dL26NBHb4Rs6jmE3lRdNMB250Ln0Yk1kMcjk1jIP
+# 7Id8Fd1RB7dkXyvDkfD6hz8m6xPdcslwKjP3yfYFA66IVoHFZF28JcSienbAR4jh
+# TkE1sKpshqeibSn9zl6uRt/hUWU5fVciqu7edREvHZVe3I3mDzQ8UnG8N6IO6cGn
+# 5q7P2+RF6qIk2Y0NYULhar9Ff2liWanzgGGJ4NLrOH1SP1VGSpSOPNU9WkiwohEI
+# Grm1wS1WvmoSjuk2ZAplAeShc0jK+jfn+dZhjy7/jKM0rs2aSiX6a06/orJJKYHG
+# ues5uBNxYtZZCUtdU3p8c5cA98a2SDBMcqCRTVQbQCmYfqPwAS/yDzahggNLMIID
 # RwYJKoZIhvcNAQkGMYIDODCCAzQCAQEwgZEwfTELMAkGA1UEBhMCR0IxGzAZBgNV
 # BAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4GA1UEBxMHU2FsZm9yZDEYMBYGA1UE
 # ChMPU2VjdGlnbyBMaW1pdGVkMSUwIwYDVQQDExxTZWN0aWdvIFJTQSBUaW1lIFN0
 # YW1waW5nIENBAhA5TCXhfKBtJ6hl4jvZHSLUMA0GCWCGSAFlAwQCAgUAoHkwGAYJ
-# KoZIhvcNAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMjMwNTE5MjIw
-# MDUwWjA/BgkqhkiG9w0BCQQxMgQwwUN6xtKTe+woOR0Bvf4VsHb8GSAwb94cQJId
-# TUntAMKXhENgaZtzmjYXL46Gda1jMA0GCSqGSIb3DQEBAQUABIICAGYrL99J+day
-# KxetkoeytSQWZ3nd7vuavuTv53OW6v7IJ56abBfwMZHa7ULfhsx8Qg3iFZ3gQ0UG
-# e03YreautGgVAT/15QjJ1f4LU2DUc3xl5XxHePkqw/UlJqLtXtOt2OF1eB3URz/N
-# Q2ZRWpNGqAcdkGqET8CeZptZ1XQ90nTvD6yH73Bhu3z/2MxbXb6rmZblB8rBN6IN
-# sMJvWPdpkjp7KJwqAAZkxfCAt17ohBNbbZeQqRSKcCxhHl2oI8uYk8xy+NFcg6Cc
-# jRyZabAsd+hn74DV8/1+jvUD4LVapna9FclcU6QKtuS5UhveWnR+XlzQ2auCsBeI
-# WOpa40uycehGbYBZLWxQuGXrhn111b2q84UGcaJnOH9QCjiKLILUFL1z/YhXXgKS
-# /wAYH6Yo7yFd+/zau73q0FTatt66nYxbMlfxoCwbGbeQJIccDN7hZ1Hb9vz079qZ
-# HNO/9enovq7WHh5ttIzTrHGJrg5bIzUoV78FplHdcBfORQGhtZsQEoDiFe9a+Lmm
-# YtIQNtybt+9wLBHKj/tlSGLd5RLfOTWKjNzuuOHjE+yDNy2UqrFaLY/We0tM+Z9R
-# tK1rsA1b0/PCGB0NscsQ5Xg+juk1fmRQ6auhpeXRHeh/4RP5tmUX00AfiBKkaFp9
-# +nMf+Ho0Psa+TwTIii3SEFFbZJ9jhRzL
+# KoZIhvcNAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMjMwNjAxMjAz
+# NTExWjA/BgkqhkiG9w0BCQQxMgQw5E+n8/8PlWvtMikU4ud+bBvtYRdV04BOa+wc
+# SOicKJzL4lq0NJG0NSfEbySUkGiNMA0GCSqGSIb3DQEBAQUABIICAAcg3hgM1bUB
+# az5pJO2xmCbUConEfseD1LPUhJN+A5BpEUyvyn7xw6NhRxjQqJYF4TY8okUvgGC9
+# 6UxAGJHe9die3Zpf92Fkclqsh9hfBB4A/R8TlVbr+ahoThFe5Z6zkB5HktpLxlFg
+# qcF9IF2B6/qYuuc5zi7a/zSTPQ/M9EAR6LdkoRmORCAK6QqZtMJEda8S1dYrZs2x
+# YFx4iFGt2fGrPFZELCLTn4QNA5EcFq05IvDGVcxc75JYqh2XBss6m4ecWvFrdd/N
+# HxA+6MM9rIBaJKukeZoCMFpNnEHisQWGKWsJQLrSzEzES5EObPCpuMlzwRbXrOFl
+# gj3b0MCJYOhCU2aVYczJx1WRDtN5SqCNHHrGWkD/jOt2jH+JjzWT+sCMMJ0H5zfe
+# Fzq0EP20OMtbKkocS45Le+jvyCJcoC+Zg1us3r07RHHgnuXMFXNSJm8YyEB0o+Qb
+# MzJmAcT6txdB1GL9StfJ0xYrlFNoNcUBUcteAQakudFoj7UXS0RiCcSKWUQ0CBBe
+# JFoz4HnY+4hhI+EMvNDVkniKJc3yt8mV47rwB9ZC45q4ZNocssNofPq2SEvVbZ/L
+# U5kvM1dLQEotYaGVSuVq9jYdgOpCGurNjzF9JUj0QhJv5WgCXJazJB+ipW7Cc6eT
+# ksRWvRzILaPQHQ1qgRe6odwwaE1gLbsQ
 # SIG # End signature block
